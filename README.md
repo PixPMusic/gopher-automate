@@ -20,6 +20,14 @@ Configure your MIDI controllers to trigger actions and manage device layouts—a
 
 Download the latest release for your platform from the [Releases](https://github.com/PixPMusic/gopher-automate/releases) page.
 
+If you encounter an "The app is damaged and can't be opened. You should move it to the Trash." error when running the pre-built macOS app, try running this first:
+
+```bash
+xattr -d com.apple.quarantine GopherAutomate.app
+```
+
+The app likely isn't damaged, but is instead triggering Gatekeeper. The error message is a bit misleading, as it should read "This app is from an unidentified developer." and let you open it by using `System Settings > Security & Privacy > General`, but this seems to not always work.
+
 ### Build from Source
 
 Requires Go 1.24+ and the [Fyne CLI](https://docs.fyne.io/started/).
