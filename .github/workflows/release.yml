@@ -148,6 +148,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           path: artifacts
+          merge-multiple: true
 
       - name: Create Release
         uses: ncipollo/release-action@v1
@@ -157,4 +158,5 @@ jobs:
           body: ${{ steps.changelog.outputs.changes }}
           # Collect macOS apps, Linux zips, and Windows executables
           artifacts: "artifacts/GopherAutomate-macos-*.app.zip,artifacts/GopherAutomate-linux-*.zip,artifacts/GopherAutomate-windows-*.exe"
+          artifactErrorsFailBuild: true
           allowUpdates: true
