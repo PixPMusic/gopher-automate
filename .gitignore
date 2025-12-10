@@ -4,6 +4,7 @@
 *.dll
 *.so
 *.dylib
+gopher-automate
 
 # Test binary
 *.test
