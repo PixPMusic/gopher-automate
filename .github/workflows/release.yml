@@ -15,7 +15,7 @@ jobs:
           - arch: amd64
             runner: macos-15-intel # Intel
           - arch: arm64
-            runner: macos-latest # Apple Silicon
+            runner: macos-15 # Apple Silicon
     steps:
       - uses: actions/checkout@v4
 
