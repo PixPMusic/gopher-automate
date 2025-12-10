@@ -21,7 +21,7 @@ Write-Host "Detected version: $Version"
 # Check for Fyne
 if (-not (Get-Command "fyne" -ErrorAction SilentlyContinue)) {
     Write-Host "Installing Fyne CLI..."
-    go install fyne.io/fyne/v2/cmd/fyne@latest
+    go install fyne.io/tools/cmd/fyne@latest
 }
 
 Write-Host "Packaging for Windows..."

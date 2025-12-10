@@ -18,7 +18,7 @@ echo "Detected version: $VERSION"
 # Check if fyne tool is installed
 if ! command -v fyne &> /dev/null; then
     echo "Installing Fyne CLI..."
-    go install fyne.io/fyne/v2/cmd/fyne@latest
+    go install fyne.io/tools/cmd/fyne@latest
 fi
 
 # Package the app using Fyne CLI
