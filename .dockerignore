@@ -1,0 +1,2 @@
+# Ignore everything - Dockerfile only installs packages, no COPY needed
+*

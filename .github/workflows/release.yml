@@ -1,0 +1,160 @@
+name: Release
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  build-macos:
+    name: Build macOS ${{ matrix.arch }}
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            runner: macos-13 # Intel
+          - arch: arm64
+            runner: macos-14 # Apple Silicon
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.24"
+
+      - name: Install Fyne CLI
+        run: go install fyne.io/fyne/v2/cmd/fyne@latest
+
+      - name: Get version from CHANGELOG
+        id: changelog
+        uses: mindsers/changelog-reader-action@v2
+        with:
+          validation_level: warn
+
+      - name: Build application
+        run: fyne package -os darwin -icon assets/app_icon.png -name GopherAutomate -app-id "cc.pixp.GopherAutomate" -app-version "${{ steps.changelog.outputs.version }}"
+
+      - name: Package
+        run: |
+          # Hide from Dock (agent app)
+          plutil -insert LSUIElement -bool true GopherAutomate.app/Contents/Info.plist
+          zip -r GopherAutomate-macos-${{ matrix.arch }}.app.zip GopherAutomate.app
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: GopherAutomate-macos-${{ matrix.arch }}
+          path: GopherAutomate-macos-${{ matrix.arch }}.app.zip
+
+  build-linux:
+    name: Build Linux
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.24"
+
+      - name: Install fyne-cross
+        run: go install github.com/fyne-io/fyne-cross@latest
+
+      - name: Get version from CHANGELOG
+        id: changelog
+        uses: mindsers/changelog-reader-action@v2
+        with:
+          validation_level: warn
+
+      - name: Build Custom Docker Image
+        run: docker build -t fyneio/fyne-cross-images:linux -f scripts/docker/Dockerfile.linux .
+
+      - name: Build Linux (amd64, arm64)
+        run: |
+          fyne-cross linux -arch=amd64,arm64 -icon assets/app_icon.png -name GopherAutomate -app-id "cc.pixp.GopherAutomate" -app-version "${{ steps.changelog.outputs.version }}"
+
+          # Package Linux AMD64
+          cd fyne-cross/bin/linux-amd64
+          zip ../../../GopherAutomate-linux-amd64.zip GopherAutomate.tar.xz
+          cd -
+          
+          # Package Linux ARM64
+          cd fyne-cross/bin/linux-arm64
+          zip ../../../GopherAutomate-linux-arm64.zip GopherAutomate.tar.xz
+          cd -
+
+      - name: Upload Linux Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: GopherAutomate-linux-artifacts
+          path: |
+            GopherAutomate-linux-amd64.zip
+            GopherAutomate-linux-arm64.zip
+
+  build-windows:
+    name: Build Windows
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.24"
+
+      - name: Install Fyne CLI
+        run: go install fyne.io/fyne/v2/cmd/fyne@latest
+
+      - name: Get version from CHANGELOG
+        id: changelog
+        uses: mindsers/changelog-reader-action@v2
+        with:
+          validation_level: warn
+
+      - name: Build Windows AMD64
+        run: |
+          fyne package -os windows -icon assets/app_icon.png -name GopherAutomate -app-id "cc.pixp.GopherAutomate" -app-version "${{ steps.changelog.outputs.version }}"
+          Rename-Item GopherAutomate.exe GopherAutomate-windows-amd64.exe
+        shell: powershell
+
+      - name: Upload Windows Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: GopherAutomate-windows-amd64
+          path: GopherAutomate-windows-amd64.exe
+          
+      # Note: Native cross-compilation to Windows ARM64 from Windows AMD64 runner 
+      # requires GCC-aarch64 setup which is non-trivial on windows-latest.
+      # We are skipping Windows ARM64 for now until we can provision the toolchain.
+
+  release:
+    name: Create Release
+    runs-on: ubuntu-latest
+    needs: [build-macos, build-linux, build-windows]
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Get version from CHANGELOG
+        id: changelog
+        uses: mindsers/changelog-reader-action@v2
+        with:
+          validation_level: warn
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Create Release
+        uses: ncipollo/release-action@v1
+        with:
+          tag: ${{ steps.changelog.outputs.version }}
+          name: Release ${{ steps.changelog.outputs.version }}
+          body: ${{ steps.changelog.outputs.changes }}
+          # Collect macOS apps, Linux zips, and Windows executables
+          artifacts: "artifacts/GopherAutomate-macos-*.app.zip,artifacts/GopherAutomate-linux-*.zip,artifacts/GopherAutomate-windows-*.exe"
+          allowUpdates: true

@@ -1,0 +1,7 @@
+FROM fyneio/fyne-cross-images:linux
+
+# Add both architectures for cross-compilation libs
+RUN dpkg --add-architecture amd64 && \
+    dpkg --add-architecture arm64 && \
+    apt-get update && \
+    apt-get install -y libasound2-dev:amd64 libasound2-dev:arm64
