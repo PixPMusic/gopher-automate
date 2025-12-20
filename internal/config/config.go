@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/PixPMusic/gopher-automate/internal/actions"
 	"github.com/google/uuid"
 )
 
@@ -14,6 +15,7 @@ type DeviceType string
 const (
 	DeviceTypeClassic  DeviceType = "classic"  // Launchpad S
 	DeviceTypeColorful DeviceType = "colorful" // Launchpad Mini Mk3
+	DeviceTypeGeneric  DeviceType = "generic"  // Generic MIDI for inter-app communication
 )
 
 // PadColorConfig stores RGB colors for a pad (all values 0-127)
@@ -41,6 +43,9 @@ type PadColorConfig struct {
 	// Link flags - when true, classic color is auto-derived from button color
 	LinkButtonClassic  bool `json:"link_button_classic"`
 	LinkPressedClassic bool `json:"link_pressed_classic"`
+
+	// ActionID is the ID of the action to execute when this pad is pressed
+	ActionID string `json:"action_id,omitempty"`
 }
 
 // CalculateClassicColor converts full RGB to the classic device's approximation.
@@ -131,9 +136,17 @@ func colorTo4Level(value uint8) uint8 {
 
 // MenuLayout stores the 9x9 grid of pad colors
 type MenuLayout struct {
-	ID     string               `json:"id"`
-	Name   string               `json:"name"`
-	Colors [9][9]PadColorConfig `json:"colors"` // [row][col]
+	ID           string               `json:"id"`
+	Name         string               `json:"name"`
+	Colors       [9][9]PadColorConfig `json:"colors"`        // [row][col] - Standard 9x9 (including top row/right col)
+	LeftColors   [8]PadColorConfig    `json:"left_colors"`   // Pro: Left column (Rows 1-8)
+	BottomColors [8]PadColorConfig    `json:"bottom_colors"` // Pro: Bottom row (Cols 1-8)
+
+	// Pro+ (MK3) Additions
+	TopLeftColor         PadColorConfig    `json:"top_left_color"`         // (0,0)
+	BottomLeftColor      PadColorConfig    `json:"bottom_left_color"`      // (9,0)
+	BottomRightColor     PadColorConfig    `json:"bottom_right_color"`     // (9,9)
+	ExtendedBottomColors [8]PadColorConfig `json:"extended_bottom_colors"` // Row 10 (Cols 1-8)
 }
 
 // NewMenuLayout creates a new menu layout with all pads off
@@ -165,14 +178,38 @@ func NewDeviceConfig() DeviceConfig {
 	}
 }
 
+// MessageMapping maps a MIDI message to an action for inter-app communication
+type MessageMapping struct {
+	ID          string `json:"id"`
+	Name        string `json:"name"`         // User-friendly description
+	MessageType string `json:"message_type"` // "note", "cc", "program_change"
+	Channel     int    `json:"channel"`      // 0-15, or -1 for any channel
+	Number      int    `json:"number"`       // Note/CC number (0-127)
+	ActionID    string `json:"action_id"`    // Action to trigger
+}
+
+// NewMessageMapping creates a new message mapping with a generated ID
+func NewMessageMapping() MessageMapping {
+	return MessageMapping{
+		ID:          uuid.New().String(),
+		Name:        "New Mapping",
+		MessageType: "note",
+		Channel:     -1,
+		Number:      60,
+	}
+}
+
 // Config holds application configuration
 type Config struct {
-	FirstLaunchCompleted   bool           `json:"first_launch_completed"`
-	OpenAtStartup          bool           `json:"open_at_startup"`
-	SuppressUnsavedWarning bool           `json:"suppress_unsaved_warning"`
-	Devices                []DeviceConfig `json:"devices"`
-	Menus                  []MenuLayout   `json:"menus"`
-	CurrentMenuID          string         `json:"current_menu_id"`
+	FirstLaunchCompleted   bool                  `json:"first_launch_completed"`
+	OpenAtStartup          bool                  `json:"open_at_startup"`
+	SuppressUnsavedWarning bool                  `json:"suppress_unsaved_warning"`
+	Devices                []DeviceConfig        `json:"devices"`
+	Menus                  []MenuLayout          `json:"menus"`
+	CurrentMenuID          string                `json:"current_menu_id"`
+	Actions                []actions.Action      `json:"actions"`
+	ActionGroups           []actions.ActionGroup `json:"action_groups"`
+	MessageMappings        []MessageMapping      `json:"message_mappings"`
 }
 
 // configDir returns the platform-appropriate config directory
@@ -290,4 +327,34 @@ func (c *Config) UpdateDevice(device DeviceConfig) {
 			return
 		}
 	}
+}
+
+// GetActionStore returns an ActionStore populated with config's actions and groups
+func (c *Config) GetActionStore() *actions.ActionStore {
+	store := actions.NewActionStore()
+	store.Actions = c.Actions
+	store.Groups = c.ActionGroups
+	if store.Actions == nil {
+		store.Actions = []actions.Action{}
+	}
+	if store.Groups == nil {
+		store.Groups = []actions.ActionGroup{}
+	}
+	return store
+}
+
+// SyncActionStore updates the config's actions and groups from an ActionStore
+func (c *Config) SyncActionStore(store *actions.ActionStore) {
+	c.Actions = store.Actions
+	c.ActionGroups = store.Groups
+}
+
+// GetAction returns an action by ID, or nil if not found
+func (c *Config) GetAction(id string) *actions.Action {
+	for i := range c.Actions {
+		if c.Actions[i].ID == id {
+			return &c.Actions[i]
+		}
+	}
+	return nil
 }

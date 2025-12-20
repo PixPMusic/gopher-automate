@@ -25,8 +25,6 @@ fi
 echo "Packaging..."
 fyne package -os darwin -icon "$ICON_SOURCE" -name "$APP_NAME" -app-id "$APP_ID" -app-version "$VERSION"
 
-
-
 if [ $? -ne 0 ]; then
     echo "Packaging failed!"
     exit 1

@@ -1,6 +1,9 @@
+//go:build !native
+
 package main
 
 import (
+	"flag"
 	"log"
 
 	"fyne.io/fyne/v2/app"
@@ -11,6 +14,10 @@ import (
 )
 
 func main() {
+	// Flag strictly to allow argument, though ignored in this build
+	_ = flag.String("ui", "fyne", "UI mode (ignored in non-native build)")
+	flag.Parse()
+
 	// Load configuration
 	cfg, err := config.Load()
 	if err != nil {
